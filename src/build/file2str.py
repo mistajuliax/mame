@@ -34,14 +34,12 @@ except IOError:
 
 byteCount = os.path.getsize(srcfile)
 try:
-    dst = open(dstfile,'w')
-    dst.write('extern const %s %s[];\n' % ( type, varname ))
-    dst.write('const %s %s[] =\n{\n\t' % ( type, varname))
-    offs = 0
-    with open(srcfile, "rb") as src:
-        while True:
-            chunk = src.read(16)
-            if chunk:
+    with open(dstfile,'w') as dst:
+        dst.write('extern const %s %s[];\n' % ( type, varname ))
+        dst.write('const %s %s[] =\n{\n\t' % ( type, varname))
+        offs = 0
+        with open(srcfile, "rb") as src:
+            while chunk := src.read(16):
                 for b in chunk:
                     # For Python 2.x compatibility.
                     if isinstance(b, str):
@@ -50,14 +48,11 @@ try:
                     offs += 1
                     if offs != byteCount:
                         dst.write(',')
-            else:
-                break
-            if offs != byteCount:
-                dst.write('\n\t')
-    if terminate == 1:
-        dst.write(',0x00')
-    dst.write('\n};\n')
-    dst.close()
+                if offs != byteCount:
+                    dst.write('\n\t')
+        if terminate == 1:
+            dst.write(',0x00')
+        dst.write('\n};\n')
 except IOError:
     sys.stderr.write("Unable to open output file '%s'\n" % dstfile)
     sys.exit(-1)

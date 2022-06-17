@@ -60,7 +60,7 @@ while count < len(lines):
 		if label != "":
 			text += whitespace + label + "\n"
 			whitespace += "\t"
-		
+
 		# Create the goto command
 		if dispatch[-1:] == "*":
 			goto_command = "if (is_register_register_op_16_bit()) goto %s16; else goto %s8;\n" %(dispatch[:-1], dispatch[:-1])
@@ -112,14 +112,12 @@ while count < len(lines):
 	count += 1
 
 # Output the case labels
-for i in range(0, state):
+for i in range(state):
 	print("\tcase %d:	goto %s;" % (i, states_to_dispatch.get(i, "state_%d" % i)))
 
-# Output a default case
-print "\tdefault:"
-print "\t\tfatalerror(\"Unexpected state\");"
-print "\t\tbreak;"
+lines = []
+lines
+lines
 print
 
-# Finally output the text
-print text
+lines = []

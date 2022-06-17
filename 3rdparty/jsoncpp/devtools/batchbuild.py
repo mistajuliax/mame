@@ -34,23 +34,20 @@ class BuildDesc:
                 var = var.upper()
                 if type(value) is unicode:
                     value = value.encode(sys.getdefaultencoding())
-                if var in environ:
-                    environ[var] = value + os.pathsep + environ[var]
-                else:
-                    environ[var] = value
+                environ[var] = value + os.pathsep + environ[var] if var in environ else value
         return environ
 
     def cmake_args(self):
-        args = ["-D%s" % var for var in self.variables]
+        args = [f"-D{var}" for var in self.variables]
         # skip build type for Visual Studio solution as it cause warning
         if self.build_type and 'Visual' not in self.generator:
-            args.append("-DCMAKE_BUILD_TYPE=%s" % self.build_type)
+            args.append(f"-DCMAKE_BUILD_TYPE={self.build_type}")
         if self.generator:
             args.extend(['-G', self.generator])
         return args
 
     def __repr__(self):
-        return "BuildDesc(%s, build_type=%s)" %  (" ".join(self.cmake_args()), self.build_type)
+        return f'BuildDesc({" ".join(self.cmake_args())}, build_type={self.build_type})'
 
 class BuildData:
     def __init__(self, desc, work_dir, source_dir):
@@ -63,7 +60,7 @@ class BuildData:
         self.build_succeeded = False
 
     def execute_build(self):
-        print('Build %s' % self.desc)
+        print(f'Build {self.desc}')
         self._make_new_work_dir()
         self.cmake_succeeded = self._generate_makefiles()
         if self.cmake_succeeded:
@@ -140,9 +137,13 @@ def generate_build_variants(build_descs_by_axis):
     for axis_name, axis_build_descs in list(build_descs_by_axis.items()):
         if len(build_descs):
             # for each existing build_desc and each axis build desc, create a new build_desc
-            new_build_descs = []
-            for prototype_build_desc, axis_build_desc in itertools.product(build_descs, axis_build_descs):
-                new_build_descs.append(prototype_build_desc.merged_with(axis_build_desc))
+            new_build_descs = [
+                prototype_build_desc.merged_with(axis_build_desc)
+                for prototype_build_desc, axis_build_desc in itertools.product(
+                    build_descs, axis_build_descs
+                )
+            ]
+
             build_descs = new_build_descs
         else:
             build_descs = axis_build_descs
@@ -196,8 +197,10 @@ def generate_html_report(html_report_path, builds):
         build_types = sorted(build_types_by_variable[variable])
         nb_build_type = len(build_types_by_variable[variable])
         th_vars.append('<th colspan="%d">%s</th>' % (nb_build_type, cgi.escape(' '.join(variable))))
-        for build_type in build_types:
-            th_build_types.append('<th>%s</th>' % cgi.escape(build_type))
+        th_build_types.extend(
+            f'<th>{cgi.escape(build_type)}</th>' for build_type in build_types
+        )
+
     tr_builds = []
     for generator in sorted(builds_by_generator):
         tds = [ '<td>%s</td>\n' % cgi.escape(generator) ]
@@ -205,8 +208,7 @@ def generate_html_report(html_report_path, builds):
             build_types = sorted(build_types_by_variable[variable])
             for build_type in build_types:
                 pos_key = (generator, variable, build_type)
-                build = build_by_pos_key.get(pos_key)
-                if build:
+                if build := build_by_pos_key.get(pos_key):
                     cmake_status = 'ok' if build.cmake_succeeded else 'FAILED'
                     build_status = 'ok' if build.build_succeeded else 'FAILED'
                     cmake_log_url = os.path.relpath(build.cmake_log_path, report_dir)

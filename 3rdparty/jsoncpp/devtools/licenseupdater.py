@@ -54,7 +54,7 @@ def update_license_in_source_directories(source_dirs, dry_run, show_diff):
                  as well as the change made to the file. 
     """
     from devtools import antglob
-    prune_dirs = antglob.prune_dirs + 'scons-local* ./build* ./libs ./dist'
+    prune_dirs = f'{antglob.prune_dirs}scons-local* ./build* ./libs ./dist'
     for source_dir in source_dirs:
         cpp_sources = antglob.glob(source_dir,
             includes = '''**/*.h **/*.cpp **/*.inl''',

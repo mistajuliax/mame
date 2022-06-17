@@ -24,12 +24,9 @@ def generate(env):
          if not os.path.isfile(abs_path):
             return 0
          fn = os.path.basename(path)
-         match = 0
-         for include in includes:
-            if fnmatch.fnmatchcase(fn, include):
-               match = 1
-               break
-         if match == 1 and not excludes is None:
+         match = next(
+             (1 for include in includes if fnmatch.fnmatchcase(fn, include)), 0)
+         if match == 1 and excludes is not None:
             for exclude in excludes:
                if fnmatch.fnmatchcase(fn, exclude):
                   match = 0

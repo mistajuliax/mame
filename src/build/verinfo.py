@@ -54,9 +54,8 @@ def parse_args():
 def extract_version(input):
     pattern = re.compile('\s+BARE_BUILD_VERSION\s+"(([^."]+)\.([^."]+))"')
     for line in input.readlines():
-        match = pattern.search(line)
-        if match:
-            return match.group(1), match.group(2), match.group(3)
+        if match := pattern.search(line):
+            return match[1], match[2], match[3]
     return None, None, None
 
 
@@ -104,7 +103,7 @@ else:
     internal_name = "MAME" if build == "mame" else build
     original_filename = "MAME" if build == "mame" else build
     product_name = "MAME" if build == "mame" else build
-    bundle_identifier = "org.mamedev." + build
+    bundle_identifier = f"org.mamedev.{build}"
 
 legal_copyright = "Copyright Nicola Salmoria and the MAME team"
 

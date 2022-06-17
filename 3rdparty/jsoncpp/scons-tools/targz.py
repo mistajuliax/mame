@@ -35,8 +35,7 @@ if internal_targz:
         def archive_name(path):
             path = os.path.normpath(os.path.abspath(path))
             common_path = os.path.commonprefix((base_dir, path))
-            archive_name = path[len(common_path):]
-            return archive_name
+            return path[len(common_path):]
             
         def visit(tar, dirname, names):
             for name in names:

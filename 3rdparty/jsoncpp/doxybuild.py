@@ -29,7 +29,7 @@ def find_program(*filenames):
     @return: the full path of the filename if found, or '' if filename could not be found
 """
     paths = os.environ.get('PATH', '').split(os.pathsep)
-    suffixes = ('win32' in sys.platform) and '.exe .com .bat .cmd' or ''
+    suffixes = '.exe .com .bat .cmd' if 'win32' in sys.platform else ''
     for filename in filenames:
         for name in [filename+ext for ext in suffixes.split(' ')]:
             for directory in paths:
@@ -69,10 +69,7 @@ def run_cmd(cmd, silent=False):
     info = 'Running: %r in %r' %(' '.join(cmd), os.getcwd())
     print(info)
     sys.stdout.flush()
-    if silent:
-        status, output = getstatusoutput(cmd)
-    else:
-        status, output = subprocess.call(cmd), ''
+    status, output = getstatusoutput(cmd) if silent else (subprocess.call(cmd), '')
     if status:
         msg = 'Error while %s ...\n\terror=%d, output="""%s"""' %(info, status, output)
         raise Exception(msg)
@@ -111,7 +108,7 @@ def build_doc(options,  make_release=False):
     warning_log_path = os.path.join(output_dir, '../jsoncpp-doxygen-warning.log')
     html_output_path = os.path.join(output_dir, html_output_dirname)
     def yesno(bool):
-        return bool and 'YES' or 'NO'
+        return 'YES' if bool else 'NO'
     subst_keys = {
         '%JSONCPP_VERSION%': version,
         '%DOC_TOPDIR%': '',

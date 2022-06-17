@@ -200,7 +200,10 @@ class Instruction:
 
     def EmitDasm(self, f, prefix):
         opcode, args = self.GetDasmInfo()
-        args = [", " + a for a in args]
+        args = [f", {a}" for a in args]
+        opcode, args = self.GetDasmInfo()
+        opcode, args = self.GetDasmInfo()
+        opcode, args = self.GetDasmInfo()
         print >>f, "%scase 0x%02x:" % (prefix, self._id)
         print >>f, "%s  sprintf(buf, \"%s\"%s);" % (prefix, opcode, "".join(args))
         print >>f, "%s  break;" % prefix
@@ -236,27 +239,25 @@ class Instruction:
         for r in self._run:
             if "%wa(" in r:
                 assert r.endswith(");")
-                r = r[0:-2].replace("%wa(", "%wa1 ") + ";"
-                out.append(r)
-                out.append("%wa2")
+                r = r[:-2].replace("%wa(", "%wa1 ") + ";"
+                out.extend((r, "%wa2"))
             elif "%wd(" in r:
                 assert r.endswith(");")
-                r = r[0:-2].replace("%wd(", "%wd1 ") + ";"
+                r = r[:-2].replace("%wd(", "%wd1 ") + ";"
                 out.append(r)
             elif "%wc(" in r:
                 assert r.endswith(");")
-                r = r[0:-2].replace("%wc(", "%wc1 ") + ";"
+                r = r[:-2].replace("%wc(", "%wc1 ") + ";"
                 out.append(r)
             elif "%b(" in r:
                 assert r.endswith(");")
-                r = r[0:-2].replace("%b(", "%b1") + ";"
-                out.append(r)
-                out.append("%b2")
+                r = r[:-2].replace("%b(", "%b1") + ";"
+                out.extend((r, "%b2"))
             elif "%sfai(" in r:
                 assert r.endswith(");")
-                r = r[0:-2].replace("%sfai(", "")
+                r = r[:-2].replace("%sfai(", "")
                 r = r.replace(",", " = %sfai1", 1)
-                out.append(r + "%sfai2;")
+                out.append(f"{r}%sfai2;")
             else:
                 out.append(r)
         return out
@@ -264,19 +265,19 @@ class Instruction:
 
     def EmitCintrpRecurse(self, f, prefix, no, flags_fixed, flags_unfixed):
         if not flags_unfixed:
-            vals = []
-            for v in  VARIANT_CANONICAL_ORDER:
-                if v in flags_fixed:
-                    #print "@@@@", f
-                    vals.append("%s=%d" % (v, flags_fixed[v]))
+            vals = [
+                "%s=%d" % (v, flags_fixed[v])
+                for v in VARIANT_CANONICAL_ORDER
+                if v in flags_fixed
+            ]
+
             out = ["case %d: // %s %s" % (no, self._name, " ".join(vals))]
             for line in self.PreprocessRunString():
                 exp = self.ExpandCintrp(line, flags_fixed)
                 # ensure we're not outputing a = a;
                 if not CheckSelfAssign(exp):
                     out.append(exp)
-            out.append("  break;")
-            out.append("")
+            out.extend(("  break;", ""))
             EmitWithPrefix(f, out, prefix)
             return no + 1
         x = flags_unfixed.pop(-1)
@@ -327,7 +328,7 @@ def ins_cmp_dasm(a, b):
 def LoadLst(filename):
     instructions = []
     ins = None
-    for n, line in enumerate(open(filename, "rU")):
+    for line in open(filename, "rU"):
         line = line.rstrip()
         if not line and ins:
             # new lines separate intructions
@@ -402,8 +403,6 @@ def EmitCdec(f, ins_list):
         i.EmitCdec(f, "", no, i._cat == "2a")
         no += i._variants
         print >>f
-    print >>f, "#endif"
-    print >>f
 
 def EmitCintrp(f, ins_list):
     ins_list.sort(cmp=ins_cmp_dasm)

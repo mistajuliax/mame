@@ -21,10 +21,7 @@ class TestProxy(object):
         self.use_valgrind = use_valgrind
 
     def run(self, options):
-        if self.use_valgrind:
-            cmd = VALGRIND_CMD.split()
-        else:
-            cmd = []
+        cmd = VALGRIND_CMD.split() if self.use_valgrind else []
         cmd.extend([self.test_exe_path, '--test-auto'] + options)
         try:
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -45,7 +42,7 @@ def runAllTests(exe_path, use_valgrind=False):
     test_names = [name.strip() for name in test_names.decode('utf-8').strip().split('\n')]
     failures = []
     for name in test_names:
-        print('TESTING %s:' % name, end=' ')
+        print(f'TESTING {name}:', end=' ')
         succeed, result = test_proxy.run(['--test', name])
         if succeed:
             print('OK')

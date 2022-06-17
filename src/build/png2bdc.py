@@ -94,9 +94,7 @@ class RenderFont:
     def __init__(self):
         self.height = 0         # height of the font, from ascent to descent
         self.yOffs = 0          # y offset from baseline to descent
-        self.chars = list()     # array of characters
-        for i in range(0, 65536):
-            self.chars.append(RenderFontChar())
+        self.chars = [RenderFontChar() for _ in range(65536)]
 
 
 
@@ -115,14 +113,10 @@ def renderFontSaveCached(font, filename, hash32):
         return 1
 
     # Write the header
-    numChars = 0
-    for c in font.chars:
-        if c.width > 0:
-            numChars += 1
-
+    numChars = sum(c.width > 0 for c in font.chars)
     CACHED_CHAR_SIZE = 12
     CACHED_HEADER_SIZE = 16
-    
+
     try:
         fp.write(b'f')
         fp.write(b'o')
@@ -140,48 +134,48 @@ def renderFontSaveCached(font, filename, hash32):
         fp.write(b2p(numChars >> 16 & 0xff))
         fp.write(b2p(numChars >> 8 & 0xff))
         fp.write(b2p(numChars >> 0 & 0xff))
-        
+
         # Write a blank table at first (?)
         charTable = [0]*(numChars * CACHED_CHAR_SIZE)
         for i in range(numChars * CACHED_CHAR_SIZE):
             fp.write(b2p(charTable[i]))
-        
+
         # Loop over all characters
         tableIndex = 0
-        
+
         for i in range(len(font.chars)):
             c = font.chars[i]
             if c.width == 0:
                 continue
-            
+
             if c.bitmap:
-                dBuffer = list()
+                dBuffer = []
                 accum = 0
                 accbit = 7
-    
+
                 # Bit-encode the character data
-                for y in range(0, c.bmHeight):
+                for y in range(c.bmHeight):
                     src = None
                     desty = y + font.height + font.yOffs - c.yOffs - c.bmHeight
                     if desty >= 0 and desty < font.height:
                         src = c.bitmap[desty]
-                    for x in range(0, c.bmWidth):
+                    for x in range(c.bmWidth):
                         if src is not None and src[x] != 0:
                             accum |= 1 << accbit
                         accbit -= 1
-                        if accbit+1 == 0:
+                        if accbit == -1:
                             dBuffer.append(accum)
                             accum = 0
                             accbit = 7
-                
+
                 # Flush any extra
                 if accbit != 7:
                     dBuffer.append(accum)
-                
+
                 # Write the data
-                for j in range(len(dBuffer)):
-                    fp.write(b2p(dBuffer[j]))
-            
+                for item in dBuffer:
+                    fp.write(b2p(item))
+
             destIndex = tableIndex * CACHED_CHAR_SIZE
             charTable[destIndex +  0] = i >> 8 & 0xff
             charTable[destIndex +  1] = i >> 0 & 0xff
@@ -196,12 +190,12 @@ def renderFontSaveCached(font, filename, hash32):
             charTable[destIndex + 10] = c.bmHeight >> 8 & 0xff
             charTable[destIndex + 11] = c.bmHeight >> 0 & 0xff
             tableIndex += 1
-    
+
         # Seek back to the beginning and rewrite the table
         fp.seek(CACHED_HEADER_SIZE, 0)
         for i in range(numChars * CACHED_CHAR_SIZE):
             fp.write(b2p(charTable[i]))
-    
+
         fp.close()
         return 0
 
@@ -215,21 +209,23 @@ def bitmapToChars(pngObject, font):
     Convert a bitmap to characters in the given font
     """
     # Just cache the bitmap into a list of lists since random access is paramount
-    bitmap = list()
+    bitmap = []
     width = pngObject.asRGBA8()[0]
     height = pngObject.asRGBA8()[1]
     rowGenerator = pngObject.asRGBA8()[2]
     for row in rowGenerator:
-        cRow = list()
         irpd = iter(row)
-        for r,g,b,a in zip(irpd, irpd, irpd, irpd):
-            cRow.append(a << 24 | r << 16 | g << 8 | b)
+        cRow = [
+            a << 24 | r << 16 | g << 8 | b
+            for r, g, b, a in zip(irpd, irpd, irpd, irpd)
+        ]
+
         bitmap.append(cRow)
-    
+
     rowStart = 0
     while rowStart < height:
         # Find the top of the row
-        for i in range(rowStart, height):
+        for _ in range(rowStart, height):
             if pixelIsSet(bitmap[rowStart][0]):
                 break
             rowStart += 1
@@ -238,7 +234,7 @@ def bitmapToChars(pngObject, font):
 
         # Find the bottom of the row
         rowEnd = rowStart + 1
-        for i in range(rowEnd, height):
+        for _ in range(rowEnd, height):
             if not pixelIsSet(bitmap[rowEnd][0]):
                 rowEnd -= 1
                 break
@@ -246,7 +242,7 @@ def bitmapToChars(pngObject, font):
 
         # Find the baseline
         baseline = rowStart
-        for i in range(rowStart, rowEnd+1):
+        for _ in range(rowStart, rowEnd+1):
             if pixelIsSet(bitmap[baseline][1]):
                 break
             baseline += 1
@@ -268,8 +264,8 @@ def bitmapToChars(pngObject, font):
 
         # decode the starting character
         chStart = 0
-        for x in range(0, 4):
-            for y in range(0, 4):
+        for x in range(4):
+            for y in range(4):
                 chStart = (chStart << 1) | pixelIsSet(bitmap[rowStart+y][2+x])
 
         # Print debug info
@@ -281,7 +277,7 @@ def bitmapToChars(pngObject, font):
             ch = RenderFontChar()
 
             # Find the start of the character
-            for i in range(colStart, width):
+            for _ in range(colStart, width):
                 if pixelIsSet(bitmap[rowEnd+2][colStart]):
                     break
                 colStart += 1
@@ -290,7 +286,7 @@ def bitmapToChars(pngObject, font):
 
             # Find the end of the character
             colEnd = colStart + 1
-            for i in range(colEnd, width):
+            for _ in range(colEnd, width):
                 if not pixelIsSet(bitmap[rowEnd+2][colEnd]):
                     colEnd -= 1
                     break
@@ -302,7 +298,7 @@ def bitmapToChars(pngObject, font):
                 # print "  Character %X - width = %d" % (chStart, colEnd - colStart + 1)
 
                 # Plot the character
-                ch.bitmap = list()
+                ch.bitmap = []
                 for y in range(rowStart, rowEnd+1):
                     ch.bitmap.append(list())
                     for x in range(colStart, colEnd+1):
@@ -317,7 +313,7 @@ def bitmapToChars(pngObject, font):
                 ch.yOffs = font.yOffs
                 ch.bmWidth = len(ch.bitmap[0])
                 ch.bmHeight = len(ch.bitmap)
-                
+
                 # Insert the character into the list
                 font.chars[chStart] = ch
 
@@ -327,7 +323,7 @@ def bitmapToChars(pngObject, font):
 
         # Next row
         rowStart = rowEnd + 1
-    
+
     # Return non-zero if we errored
     return rowStart < height
 

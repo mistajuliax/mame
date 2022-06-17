@@ -78,39 +78,41 @@ def runAllTests(jsontest_executable_path, input_dir = None,
         expect_failure = os.path.basename(input_path).startswith('fail')
         is_json_checker_test = (input_path in test_jsonchecker) or expect_failure
         print('TESTING:', input_path, end=' ')
-        options = is_json_checker_test and '--json-checker' or ''
-        options += ' --json-writer %s'%writerClass
+        options = '--json-checker' if is_json_checker_test else ''
+        options += f' --json-writer {writerClass}'
         cmd = '%s%s %s "%s"' % (            valgrind_path, jsontest_executable_path, options,
             input_path)
         status, process_output = getStatusOutput(cmd)
         if is_json_checker_test:
-            if expect_failure:
-                if not status:
-                    print('FAILED')
-                    failed_tests.append((input_path, 'Parsing should have failed:\n%s' %
-                                          safeReadFile(input_path)))
-                else:
-                    print('OK')
+            if expect_failure and not status:
+                print('FAILED')
+                failed_tests.append((input_path, 'Parsing should have failed:\n%s' %
+                                      safeReadFile(input_path)))
+            elif expect_failure or not status:
+                print('OK')
             else:
-                if status:
-                    print('FAILED')
-                    failed_tests.append((input_path, 'Parsing failed:\n' + process_output))
-                else:
-                    print('OK')
+                print('FAILED')
+                failed_tests.append((input_path, 'Parsing failed:\n' + process_output))
         else:
             base_path = os.path.splitext(input_path)[0]
-            actual_output = safeReadFile(base_path + '.actual')
-            actual_rewrite_output = safeReadFile(base_path + '.actual-rewrite')
-            open(base_path + '.process-output', 'wt', encoding = 'utf-8').write(process_output)
+            actual_output = safeReadFile(f'{base_path}.actual')
+            actual_rewrite_output = safeReadFile(f'{base_path}.actual-rewrite')
+            open(f'{base_path}.process-output', 'wt', encoding='utf-8').write(
+                process_output
+            )
+
             if status:
                 print('parsing failed')
                 failed_tests.append((input_path, 'Parsing failed:\n' + process_output))
             else:
-                expected_output_path = os.path.splitext(input_path)[0] + '.expected'
+                expected_output_path = f'{os.path.splitext(input_path)[0]}.expected'
                 expected_output = open(expected_output_path, 'rt', encoding = 'utf-8').read()
-                detail = (compareOutputs(expected_output, actual_output, 'input')
-                            or compareOutputs(expected_output, actual_rewrite_output, 'rewrite'))
-                if detail:
+                if detail := (
+                    compareOutputs(expected_output, actual_output, 'input')
+                    or compareOutputs(
+                        expected_output, actual_rewrite_output, 'rewrite'
+                    )
+                ):
                     print('FAILED')
                     failed_tests.append((input_path, detail))
                 else:
@@ -151,23 +153,29 @@ def main():
         input_path = os.path.normpath(os.path.abspath(args[1]))
     else:
         input_path = None
-    status = runAllTests(jsontest_executable_path, input_path,
-                         use_valgrind=options.valgrind,
-                         with_json_checker=options.with_json_checker,
-                         writerClass='StyledWriter')
-    if status:
+    if status := runAllTests(
+        jsontest_executable_path,
+        input_path,
+        use_valgrind=options.valgrind,
+        with_json_checker=options.with_json_checker,
+        writerClass='StyledWriter',
+    ):
         sys.exit(status)
-    status = runAllTests(jsontest_executable_path, input_path,
-                         use_valgrind=options.valgrind,
-                         with_json_checker=options.with_json_checker,
-                         writerClass='StyledStreamWriter')
-    if status:
+    if status := runAllTests(
+        jsontest_executable_path,
+        input_path,
+        use_valgrind=options.valgrind,
+        with_json_checker=options.with_json_checker,
+        writerClass='StyledStreamWriter',
+    ):
         sys.exit(status)
-    status = runAllTests(jsontest_executable_path, input_path,
-                         use_valgrind=options.valgrind,
-                         with_json_checker=options.with_json_checker,
-                         writerClass='BuiltStyledStreamWriter')
-    if status:
+    if status := runAllTests(
+        jsontest_executable_path,
+        input_path,
+        use_valgrind=options.valgrind,
+        with_json_checker=options.with_json_checker,
+        writerClass='BuiltStyledStreamWriter',
+    ):
         sys.exit(status)
 
 if __name__ == '__main__':

@@ -68,7 +68,7 @@ def ant_pattern_to_re(ant_pattern):
     """
     rex = ['^']
     next_pos = 0
-    sep_rex = r'(?:/|%s)' % re.escape(os.path.sep)
+    sep_rex = f'(?:/|{re.escape(os.path.sep)})'
 ##    print 'Converting', ant_pattern
     for match in _ANT_RE.finditer(ant_pattern):
 ##        print 'Matched', match.group()
@@ -76,13 +76,13 @@ def ant_pattern_to_re(ant_pattern):
         if match.start(0) != next_pos:
             raise ValueError("Invalid ant pattern")
         if match.group(1): # /**/
-            rex.append(sep_rex + '(?:.*%s)?' % sep_rex)
+            rex.append(sep_rex + f'(?:.*{sep_rex})?')
         elif match.group(2): # **/
-            rex.append('(?:.*%s)?' % sep_rex)
+            rex.append(f'(?:.*{sep_rex})?')
         elif match.group(3): # /**
-            rex.append(sep_rex + '.*')
+            rex.append(f'{sep_rex}.*')
         elif match.group(4): # *
-            rex.append('[^/%s]*' % re.escape(os.path.sep))
+            rex.append(f'[^/{re.escape(os.path.sep)}]*')
         elif match.group(5): # /
             rex.append(sep_rex)
         else: # somepath
@@ -92,9 +92,7 @@ def ant_pattern_to_re(ant_pattern):
     return re.compile(''.join(rex))
 
 def _as_list(l):
-    if isinstance(l, basestring):
-        return l.split()
-    return l
+    return l.split() if isinstance(l, basestring) else l
 
 def glob(dir_path,
          includes = '**/*',
@@ -109,17 +107,11 @@ def glob(dir_path,
     entry_type_filter = entry_type
 
     def is_pruned_dir(dir_name):
-        for pattern in prune_dirs:
-            if fnmatch.fnmatch(dir_name, pattern):
-                return True
-        return False
+        return any(fnmatch.fnmatch(dir_name, pattern) for pattern in prune_dirs)
 
     def apply_filter(full_path, filter_rexs):
         """Return True if at least one of the filter regular expression match full_path."""
-        for rex in filter_rexs:
-            if rex.match(full_path):
-                return True
-        return False
+        return any(rex.match(full_path) for rex in filter_rexs)
 
     def glob_impl(root_dir_path):
         child_dirs = [root_dir_path]

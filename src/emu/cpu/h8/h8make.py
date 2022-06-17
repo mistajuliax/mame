@@ -30,24 +30,30 @@ def type_to_device(dtype):
     return "h8s2600_device"
 
 def hexsplit(str):
-    res = []
-    for i in range(0, len(str), 2):
-        res.append(int(str[i:i+2], 16))
-    return res
+    return [int(str[i:i+2], 16) for i in range(0, len(str), 2)]
         
 def has_memory(ins):
-    for s in ["read", "write", "sp_push", "sp_pop", "sp32_push", "sp32_pop", "fetch(", "prefetch_start(", "prefetch(", "prefetch_noirq("]:
-        if s in ins:
-            return True
-    return False
+    return any(
+        s in ins
+        for s in [
+            "read",
+            "write",
+            "sp_push",
+            "sp_pop",
+            "sp32_push",
+            "sp32_pop",
+            "fetch(",
+            "prefetch_start(",
+            "prefetch(",
+            "prefetch_noirq(",
+        ]
+    )
 
 def has_eat(ins):
-    if "eat-all-cycles" in ins:
-        return True
-    return False
+    return "eat-all-cycles" in ins
 
 def save_full_one(f, t, name, source):
-    print("void %s::%s_full()" % (t, name), file=f)
+    print(f"void {t}::{name}_full()", file=f)
     print("{", file=f)
     substate = 1
     for line in source:
@@ -64,7 +70,7 @@ def save_full_one(f, t, name, source):
     print("", file=f)
 
 def save_partial_one(f, t, name, source):
-    print("void %s::%s_partial()" % (t, name), file=f)
+    print(f"void {t}::{name}_partial()", file=f)
     print("{", file=f)
     print("switch(inst_substate) {", file=f)
     print("case 0:", file=f)
@@ -138,11 +144,12 @@ class Opcode:
             extra_words += 2
         self.extra_words = extra_words
         base_offset = len(self.val)/2 + self.skip
-        for i in range(0, extra_words):
-            self.source.append("\tfetch(%d);\n" % (i+base_offset))
+        self.source.extend(
+            "\tfetch(%d);\n" % (i + base_offset) for i in range(extra_words)
+        )
 
     def description(self):
-        return "%s %s %s" % (self.name, self.am1, self.am2)
+        return f"{self.name} {self.am1} {self.am2}"
     
     def add_source_line(self, line):
         self.source.append(line)
@@ -153,9 +160,9 @@ class Opcode:
     def function_name(self):
         n = self.name.replace(".", "_")
         if self.am1 != "-":
-            n = n + "_" + self.am1
+            n = f"{n}_{self.am1}"
         if self.am2 != "-":
-            n = n + "_" + self.am2
+            n = f"{n}_{self.am2}"
         return n
 
     def save_dasm(self, f):
@@ -177,16 +184,16 @@ class Opcode:
             mask2 = (self.mask[0] << 8)  | self.mask[1]
             val2  = (self.val[0]  << 8)  | self.val[1]
             slot = 4
-        
+
         size = len(self.val) + 2*self.skip + 2*self.extra_words
-        
-        if self.name == "jsr" or self.name == "bsr":
+
+        if self.name in ["jsr", "bsr"]:
             flags = "%d | DASMFLAG_STEP_OVER" % size
-        elif self.name == "rts" or self.name == "rte":
+        elif self.name in ["rts", "rte"]:
             flags = "%d | DASMFLAG_STEP_OUT" % size
         else:
             flags = "%d" % size
-        
+
         print("\t{ %d, 0x%08x, 0x%08x, 0x%04x, 0x%04x, \"%s\", DASM_%s, DASM_%s, %s }, // %s" % ( slot, val, mask, val2, mask2, self.name, self.am1 if self.am1 != "-" else "none", self.am2 if self.am2 != "-" else "none", flags, "needed" if self.needed else "inherited"), file=f)
 
 class Special:
@@ -203,9 +210,7 @@ class Special:
 class Macro:
     def __init__(self, tokens):
         self.name = tokens[1]
-        self.params = []
-        for i in range(2, len(tokens)):
-            self.params.append(tokens[i])
+        self.params = [tokens[i] for i in range(2, len(tokens))]
         self.source = []
 
     def add_source_line(self, line):
@@ -214,17 +219,16 @@ class Macro:
     def apply(self, target, tokens):
         values = []
         if len(self.params) > 1:
-            for i in range(0, len(self.params)-1):
-                values.append(tokens[i+1])
+            values.extend(tokens[i+1] for i in range(len(self.params)-1))
         lval = ""
         for i in range(len(self.params)-1, len(tokens)-1):
             if lval != "":
                 lval += " "
             lval = lval + tokens[i+1]
         values.append(lval)
-        for i in range(0, len(self.source)):
+        for i in range(len(self.source)):
             line = self.source[i]
-            for j in range(0, len(self.params)):
+            for j in range(len(self.params)):
                 line = line.replace(self.params[j], values[j])
             target.add_source_line(line)
 
@@ -235,12 +239,9 @@ class DispatchStep:
         self.name = ""
         self.enabled = False
         self.mask = opc.mask[pos-1]
-        for i in range(0, pos):
+        for i in range(pos):
             self.name += "%02x" % opc.val[i]
-        if pos == 2:
-            self.skip = opc.skip
-        else:
-            self.skip = 0
+        self.skip = opc.skip if pos == 2 else 0
 
     def is_dispatch(self):
         return True
@@ -248,9 +249,7 @@ class DispatchStep:
     def source(self):
         start = self.pos // 2
         end = start + self.skip
-        s = []
-        for i in range(start, end+1):
-            s.append("\tIR[%d] = fetch();" % i)
+        s = ["\tIR[%d] = fetch();" % i for i in range(start, end+1)]
         s.append("\tinst_state = 0x%x0000 | IR[%d];" % (self.id, end))
         return s
 
@@ -268,7 +267,7 @@ class OpcodeList:
             err = sys.exc_info()[1]
             sys.stderr.write("Cannot read opcodes file %s [%s]\n" % (fname, err))
             sys.exit(1)
-        
+
         inf = None
         for line in f:
             if line.startswith("#"):
@@ -290,19 +289,13 @@ class OpcodeList:
                 if tokens[0] == "macro":
                     inf = Macro(tokens)
                     self.macros[inf.name] = inf
-                elif len(tokens) == 2 or len(tokens) == 3:
-                    if len(tokens) >= 3:
-                        otype = name_to_type(tokens[2])
-                    else:
-                        otype = -1
+                elif len(tokens) in {2, 3}:
+                    otype = name_to_type(tokens[2]) if len(tokens) >= 3 else -1
                     inf = Special(tokens[0], tokens[1], otype, dtype)
                     self.states_info.append(inf)
                 else:
-                    if len(tokens) >= 7:
-                        otype = name_to_type(tokens[6])
-                    else:
-                        otype = -1
-                    if otype == -1 or dtype == 0 or (otype != 0 and dtype != 0):
+                    otype = name_to_type(tokens[6]) if len(tokens) >= 7 else -1
+                    if otype == -1 or dtype == 0 or otype != 0:
                         inf = Opcode(tokens[0], tokens[1], tokens[2], tokens[3], tokens[4], tokens[5], otype, dtype)
                         self.opcode_info.append(inf)
                     else:
@@ -317,7 +310,7 @@ class OpcodeList:
     
     def build_dispatch(self):
         for opc in self.opcode_info:
-            for i in range(0, len(opc.val)):
+            for i in range(len(opc.val)):
                 v = opc.val[i]
                 if i == 0:
                     h = self.get(0)
@@ -337,14 +330,14 @@ class OpcodeList:
                             sys.exit(1)
                         if opc.enabled:
                             d.enabled = True
-                        h = self.get(d.id)
                     else:
                         d = DispatchStep(len(self.dispatch_info)+2, i+1, opc)
                         self.dispatch_info.append(d)
                         if opc.enabled:
                             d.enabled = True
                         h.set(v, d)
-                        h = self.get(d.id)
+
+                    h = self.get(d.id)
     
     def save_dasm(self, f, dname):
         print("const %s::disasm_entry %s::disasm_entries[] = {" % (dname, dname), file=f)
@@ -360,22 +353,22 @@ class OpcodeList:
             if opc.needed:
                 save_full_one(f, t, opc.function_name(), opc.source)
                 save_partial_one(f, t, opc.function_name(), opc.source)
-        
+
         for sta in self.states_info:
             if sta.needed:
-                save_full_one(f, t, "state_" + sta.name, sta.source)
-                save_partial_one(f, t, "state_" + sta.name, sta.source)
+                save_full_one(f, t, f"state_{sta.name}", sta.source)
+                save_partial_one(f, t, f"state_{sta.name}", sta.source)
     
     def save_dispatch(self, f, t):
         for dsp in self.dispatch_info:
-            save_full_one(f, t, "dispatch_" + dsp.name, dsp.source())
-            save_partial_one(f, t, "dispatch_" + dsp.name, dsp.source())
+            save_full_one(f, t, f"dispatch_{dsp.name}", dsp.source())
+            save_partial_one(f, t, f"dispatch_{dsp.name}", dsp.source())
     
     def save_exec(self, f, t, dtype, v):
-        print("void %s::do_exec_%s()" % (t, v), file=f)
+        print(f"void {t}::do_exec_{v}()", file=f)
         print("{", file=f)
         print("\tswitch(inst_state >> 16) {", file=f)
-        for i in range(0, len(self.dispatch_info)+2):
+        for i in range(len(self.dispatch_info)+2):
             if i == 1:
                 print("\tcase 0x01: {", file=f)
                 print("\t\tswitch(inst_state & 0xffff) {", file=f)
@@ -385,61 +378,53 @@ class OpcodeList:
                 print("\t\t}", file=f)
                 print("\t\tbreak;", file=f)
                 print("\t}", file=f)
-            else:
-                if i == 0 or self.dispatch_info[i-2].enabled:
-                    print("\tcase 0x%02x: {" % i, file=f)
-                    h = self.get(i)
-                    print("\t\tswitch((inst_state >> 8) & 0x%02x) {" % h.mask, file=f)
-                    for val, h2 in sorted(h.d.items()):
-                        if h2.enabled:
-                            fmask = h2.premask | (h.mask ^ 0xff)
-                            c = ""
-                            s = 0
-                            while s < 0x100:
-                                c += "case 0x%02x: " % (val | s)
-                                s += 1
-                                while s & fmask:
-                                    s += s & fmask
-                            print("\t\t%s{" % c, file=f)
-                            if h2.mask == 0x00:
-                                n = h2.d[0]
-                                if n.is_dispatch():
-                                    print("\t\t\tdispatch_%s_%s();" % (n.name, v), file=f)
-                                else:
-                                    print("\t\t\t%s_%s();" % (n.function_name(), v), file=f)
-                                print("\t\t\tbreak;", file=f)
+            elif i == 0 or self.dispatch_info[i - 2].enabled:
+                print("\tcase 0x%02x: {" % i, file=f)
+                h = self.get(i)
+                print("\t\tswitch((inst_state >> 8) & 0x%02x) {" % h.mask, file=f)
+                for val, h2 in sorted(h.d.items()):
+                    if h2.enabled:
+                        fmask = h2.premask | (h.mask ^ 0xff)
+                        c = ""
+                        s = 0
+                        while s < 0x100:
+                            c += "case 0x%02x: " % (val | s)
+                            s += 1
+                            while s & fmask:
+                                s += s & fmask
+                        print("\t\t%s{" % c, file=f)
+                        if h2.mask == 0x00:
+                            n = h2.d[0]
+                            if n.is_dispatch():
+                                print("\t\t\tdispatch_%s_%s();" % (n.name, v), file=f)
                             else:
-                                print("\t\t\tswitch(inst_state & 0x%02x) {" % h2.mask, file=f)
-                                if i == 0:
-                                    mpos = 1
-                                else:
-                                    mpos = self.dispatch_info[i-2].pos + 1
-                                for val2, n in sorted(h2.d.items()):
-                                    if n.enabled:
-                                        fmask = h2.mask ^ 0xff
-                                        if n.is_dispatch():
-                                            fmask = fmask | n.mask
-                                        else:
-                                            fmask = fmask | n.mask[mpos]
-                                        c = ""
-                                        s = 0
-                                        while s < 0x100:
-                                            c += "case 0x%02x: " % (val2 | s)
-                                            s += 1
-                                            while s & fmask:
-                                                s += s & fmask
-                                        if n.is_dispatch():
-                                            print("\t\t\t%sdispatch_%s_%s(); break;" % (c, n.name, v), file=f)
-                                        else:
-                                            print("\t\t\t%s%s_%s(); break;" % (c, n.function_name(), v), file=f)
-                                print("\t\t\tdefault: illegal(); break;", file=f)
-                                print("\t\t\t}", file=f)
-                                print("\t\t\tbreak;", file=f)
-                            print("\t\t}", file=f)
-                    print("\t\tdefault: illegal(); break;", file=f)
-                    print("\t\t}", file=f)
-                    print("\t\tbreak;", file=f)
-                    print("\t}", file=f)
+                                print("\t\t\t%s_%s();" % (n.function_name(), v), file=f)
+                        else:
+                            print("\t\t\tswitch(inst_state & 0x%02x) {" % h2.mask, file=f)
+                            mpos = 1 if i == 0 else self.dispatch_info[i-2].pos + 1
+                            for val2, n in sorted(h2.d.items()):
+                                if n.enabled:
+                                    fmask = h2.mask ^ 0xff
+                                    fmask = fmask | n.mask if n.is_dispatch() else fmask | n.mask[mpos]
+                                    c = ""
+                                    s = 0
+                                    while s < 0x100:
+                                        c += "case 0x%02x: " % (val2 | s)
+                                        s += 1
+                                        while s & fmask:
+                                            s += s & fmask
+                                    if n.is_dispatch():
+                                        print("\t\t\t%sdispatch_%s_%s(); break;" % (c, n.name, v), file=f)
+                                    else:
+                                        print("\t\t\t%s%s_%s(); break;" % (c, n.function_name(), v), file=f)
+                            print("\t\t\tdefault: illegal(); break;", file=f)
+                            print("\t\t\t}", file=f)
+                        print("\t\t\tbreak;", file=f)
+                        print("\t\t}", file=f)
+                print("\t\tdefault: illegal(); break;", file=f)
+                print("\t\t}", file=f)
+                print("\t\tbreak;", file=f)
+                print("\t}", file=f)
         print("\t}", file=f)
         print("}", file=f)
 

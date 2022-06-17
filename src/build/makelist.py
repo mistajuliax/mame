@@ -24,11 +24,11 @@ def parse_file(srcfile):
         while srcptr < len(line):
             c = line[srcptr]
             srcptr+=1
-            if c==13 or c==10:
+            if c in [13, 10]:
                 if c==13 and line[srcptr]==10:
                     srcptr+=1
                 continue
-            if c==' ' or c==9:
+            if c in [' ', 9]:
                 continue
             if in_comment==1 and c=='*' and line[srcptr]=='/' :
                 srcptr+=1
@@ -81,7 +81,7 @@ print('#include "drivenum.h"\n')
 
 #output the list of externs first
 for drv in sorted(drivlist):
-    print("GAME_EXTERN(%s);" % drv)
+    print(f"GAME_EXTERN({drv});")
 print("")
 
 # then output the array

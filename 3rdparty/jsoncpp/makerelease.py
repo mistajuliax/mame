@@ -20,6 +20,7 @@ Note: This was for Subversion. Now that we are in GitHub, we do not
 need to build versioned tarballs anymore, so makerelease.py is defunct.
 """
 
+
 from __future__ import print_function
 import os.path
 import subprocess
@@ -36,7 +37,7 @@ from devtools import antglob, fixeol, tarball
 import amalgamate
 
 SVN_ROOT = 'https://jsoncpp.svn.sourceforge.net/svnroot/jsoncpp/'
-SVN_TAG_ROOT = SVN_ROOT + 'tags/jsoncpp'
+SVN_TAG_ROOT = f'{SVN_ROOT}tags/jsoncpp'
 SCONS_LOCAL_URL = 'http://sourceforge.net/projects/scons/files/scons-local/1.2.0/scons-local-1.2.0.tar.gz/download'
 SOURCEFORGE_PROJECT = 'jsoncpp'
 
@@ -125,15 +126,18 @@ def fix_sources_eol(dist_dir):
     """Set file EOL for tarball distribution.
     """
     print('Preparing exported source file EOL for distribution...')
-    prune_dirs = antglob.prune_dirs + 'scons-local* ./build* ./libs ./dist'
+    prune_dirs = f'{antglob.prune_dirs}scons-local* ./build* ./libs ./dist'
     win_sources = antglob.glob(dist_dir, 
         includes = '**/*.sln **/*.vcproj',
         prune_dirs = prune_dirs)
-    unix_sources = antglob.glob(dist_dir,
-        includes = '''**/*.h **/*.cpp **/*.inl **/*.txt **/*.dox **/*.py **/*.html **/*.in
+    unix_sources = antglob.glob(
+        dist_dir,
+        includes='''**/*.h **/*.cpp **/*.inl **/*.txt **/*.dox **/*.py **/*.html **/*.in
         sconscript *.json *.expected AUTHORS LICENSE''',
-        excludes = antglob.default_excludes + 'scons.py sconsign.py scons-*',
-        prune_dirs = prune_dirs)
+        excludes=f'{antglob.default_excludes}scons.py sconsign.py scons-*',
+        prune_dirs=prune_dirs,
+    )
+
     for path in win_sources:
         fixeol.fix_source_eol(path, is_dry_run = False, verbose = True, eol = '\r\n')
     for path in unix_sources:
@@ -154,9 +158,9 @@ def download(url, target_path):
         fout.close()
 
 def check_compile(distcheck_top_dir, platform):
-    cmd = [sys.executable, 'scons.py', 'platform=%s' % platform, 'check']
+    cmd = [sys.executable, 'scons.py', f'platform={platform}', 'check']
     print('Running:', ' '.join(cmd))
-    log_path = os.path.join(distcheck_top_dir, 'build-%s.log' % platform)
+    log_path = os.path.join(distcheck_top_dir, f'build-{platform}.log')
     flog = open(log_path, 'wb')
     try:
         process = subprocess.Popen(cmd,
@@ -186,8 +190,8 @@ def run_sftp_batch(userhost, sftp, batch, retry=0):
     # psftp -agent -C blep,jsoncpp@web.sourceforge.net -batch -b batch.sftp -bc
     cmd = [sftp, '-agent', '-C', '-batch', '-b', path, '-bc', userhost]
     error = None
-    for retry_index in range(0, max(1,retry)):
-        heading = retry_index == 0 and 'Running:' or 'Retrying:'
+    for retry_index in range(max(1,retry)):
+        heading = 'Running:' if retry_index == 0 else 'Retrying:'
         print(heading, ' '.join(cmd))
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         stdout = process.communicate()[0]
@@ -203,7 +207,7 @@ def sourceforge_web_synchro(sourceforge_project, doc_dir,
                              user=None, sftp='sftp'):
     """Notes: does not synchronize sub-directory of doc-dir.
     """
-    userhost = '%s,%s@web.sourceforge.net' % (user, sourceforge_project)
+    userhost = f'{user},{sourceforge_project}@web.sourceforge.net'
     stdout = run_sftp_batch(userhost, sftp, """
 cd htdocs
 dir
@@ -223,9 +227,8 @@ exit
             path = line.strip().split()[-1:]
             if path and path[0] not in ('.', '..'):
                 existing_paths.add(path[0])
-    upload_paths = set([os.path.basename(p) for p in antglob.glob(doc_dir)])
-    paths_to_remove = existing_paths - upload_paths
-    if paths_to_remove:
+    upload_paths = {os.path.basename(p) for p in antglob.glob(doc_dir)}
+    if paths_to_remove := existing_paths - upload_paths:
         print('Removing the following file from web:')
         print('\n'.join(paths_to_remove))
         stdout = run_sftp_batch(userhost, sftp, """cd htdocs
@@ -247,7 +250,7 @@ mput %s
 exit""" % (doc_dir, ' '.join(paths)), retry=3)
 
 def sourceforge_release_tarball(sourceforge_project, paths, user=None, sftp='sftp'):
-    userhost = '%s,%s@frs.sourceforge.net' % (user, sourceforge_project)
+    userhost = f'{user},{sourceforge_project}@frs.sourceforge.net'
     run_sftp_batch(userhost, sftp, """
 mput %s
 exit
@@ -299,22 +302,19 @@ Warning: --force should only be used when developping/testing the release script
     if not options.platforms and not options.no_test:
         parser.error('You must specify either --platform or --no-test option.')
 
-    if options.ignore_pending_commit:
-        msg = ''
-    else:
-        msg = check_no_pending_commit()
+    msg = '' if options.ignore_pending_commit else check_no_pending_commit()
     if not msg:
         print('Setting version to', release_version)
         set_version(release_version)
-        svn_commit('Release ' + release_version)
+        svn_commit(f'Release {release_version}')
         tag_url = svn_join_url(SVN_TAG_ROOT, release_version)
         if svn_check_if_tag_exist(tag_url):
             if options.retag_release:
                 svn_remove_tag(tag_url, 'Overwriting previous tag')
             else:
-                print('Aborting, tag %s already exist. Use --retag to overwrite it!' % tag_url)
+                print(f'Aborting, tag {tag_url} already exist. Use --retag to overwrite it!')
                 sys.exit(1)
-        svn_tag_sandbox(tag_url, 'Release ' + release_version)
+        svn_tag_sandbox(tag_url, f'Release {release_version}')
 
         print('Generated doxygen document...')
 ##        doc_dirname = r'jsoncpp-api-html-0.5.0'
@@ -323,27 +323,30 @@ Warning: --force should only be used when developping/testing the release script
         doc_distcheck_dir = 'dist/doccheck'
         tarball.decompress(doc_tarball_path, doc_distcheck_dir)
         doc_distcheck_top_dir = os.path.join(doc_distcheck_dir, doc_dirname)
-        
+
         export_dir = 'dist/export'
         svn_export(tag_url, export_dir)
         fix_sources_eol(export_dir)
-        
-        source_dir = 'jsoncpp-src-' + release_version
-        source_tarball_path = 'dist/%s.tar.gz' % source_dir
+
+        source_dir = f'jsoncpp-src-{release_version}'
+        source_tarball_path = f'dist/{source_dir}.tar.gz'
         print('Generating source tarball to', source_tarball_path)
         tarball.make_tarball(source_tarball_path, [export_dir], export_dir, prefix_dir=source_dir)
 
-        amalgamation_tarball_path = 'dist/%s-amalgamation.tar.gz' % source_dir
+        amalgamation_tarball_path = f'dist/{source_dir}-amalgamation.tar.gz'
         print('Generating amalgamation source tarball to', amalgamation_tarball_path)
         amalgamation_dir = 'dist/amalgamation'
-        amalgamate.amalgamate_source(export_dir, '%s/jsoncpp.cpp' % amalgamation_dir, 'json/json.h')
-        amalgamation_source_dir = 'jsoncpp-src-amalgamation' + release_version
+        amalgamate.amalgamate_source(
+            export_dir, f'{amalgamation_dir}/jsoncpp.cpp', 'json/json.h'
+        )
+
+        amalgamation_source_dir = f'jsoncpp-src-amalgamation{release_version}'
         tarball.make_tarball(amalgamation_tarball_path, [amalgamation_dir],
                               amalgamation_dir, prefix_dir=amalgamation_source_dir)
 
         # Decompress source tarball, download and install scons-local
         distcheck_dir = 'dist/distcheck'
-        distcheck_top_dir = distcheck_dir + '/' + source_dir
+        distcheck_top_dir = f'{distcheck_dir}/{source_dir}'
         print('Decompressing source tarball to', distcheck_dir)
         rmdir_if_exist(distcheck_dir)
         tarball.decompress(source_tarball_path, distcheck_dir)
@@ -382,7 +385,7 @@ Warning: --force should only be used when developping/testing the release script
 
         # Set next version number and commit            
         set_version(next_version)
-        svn_commit('Released ' + release_version)
+        svn_commit(f'Released {release_version}')
     else:
         sys.stderr.write(msg + '\n')
  

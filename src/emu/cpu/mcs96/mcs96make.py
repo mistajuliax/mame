@@ -9,7 +9,7 @@ Usage:
 import sys
 
 def save_full_one(f, t, name, source):
-    print("void %s_device::%s_full()" % (t, name), file=f)
+    print(f"void {t}_device::{name}_full()", file=f)
     print("{", file=f)
     for line in source:
         print(line, file=f)
@@ -20,17 +20,13 @@ class Opcode:
     def __init__(self, rng, name, amode, is_196, ea):
         rng1 = rng.split("-")
         self.rng_start = int(rng1[0], 16)
-        if len(rng1) == 2:
-            self.rng_end = int(rng1[1], 16)
-        else:
-            self.rng_end = self.rng_start
+        self.rng_end = int(rng1[1], 16) if len(rng1) == 2 else self.rng_start
         self.name = name
         self.amode = amode
         self.source = []
         self.is_196 = is_196
         if amode in ea:
-            for line in ea[amode].source:
-                self.source.append(line)
+            self.source.extend(iter(ea[amode].source))
 
     def add_source_line(self, line):
         self.source.append(line)
@@ -46,21 +42,17 @@ class Special:
 class Macro:
     def __init__(self, tokens):
         self.name = tokens[1]
-        self.params = []
-        for i in range(2, len(tokens)):
-            self.params.append(tokens[i])
+        self.params = [tokens[i] for i in range(2, len(tokens))]
         self.source = []
 
     def add_source_line(self, line):
         self.source.append(line)
 
     def apply(self, target, tokens):
-        values = []
-        for i in range(1, len(tokens)):
-            values.append(tokens[i])
-        for i in range(0, len(self.source)):
+        values = [tokens[i] for i in range(1, len(tokens))]
+        for i in range(len(self.source)):
             line = self.source[i]
-            for j in range(0, len(self.params)):
+            for j in range(len(self.params)):
                 line = line.replace(self.params[j], values[j])
             target.add_source_line(line)
 
@@ -116,13 +108,13 @@ class OpcodeList:
 
     def save_dasm(self, f, t):
         print("const %s_device::disasm_entry %s_device::disasm_entries[0x100] = {" % (t, t), file=f)
-        for i in range(0, 0x100):
+        for i in range(0x100):
             if i in self.opcode_per_id:
                 opc = self.opcode_per_id[i]
                 alt = "NULL"
                 if i + 0xfe00 in self.opcode_per_id:
                     alt = "\"" + self.opcode_per_id[i+0xfe00].name + "\""
-                if opc.name == "scall" or opc.name == "lcall":
+                if opc.name in ["scall", "lcall"]:
                     flags = "DASMFLAG_STEP_OVER"
                 elif opc.name == "rts":
                     flags = "DASMFLAG_STEP_OUT"
@@ -142,23 +134,23 @@ class OpcodeList:
             is_196 = True
         for opc in self.opcode_info:
             if opc.is_196 == is_196:
-                save_full_one(f, t, opc.name + "_" + opc.amode + pf, opc.source)
+                save_full_one(f, t, f"{opc.name}_{opc.amode}{pf}", opc.source)
         if not is_196:
             save_full_one(f, t, "fetch", self.fetch.source)
             save_full_one(f, t, "fetch_noirq", self.fetch_noirq.source)
     
     def save_exec(self, f, t):
-        print("void %s_device::do_exec_full()" % t, file=f)
+        print(f"void {t}_device::do_exec_full()", file=f)
         print("{", file=f)
         print("\tswitch(inst_state) {", file=f)
-        for i in range(0x000, 0x200):
+        for i in range(0x200):
             opc = None
             if i >= 0x100 and i-0x100+0xfe00 in self.opcode_per_id:
                 opc = self.opcode_per_id[i-0x100+0xfe00]
             if opc is None and (i & 0xff) in self.opcode_per_id:
                 opc = self.opcode_per_id[i & 0xff]
             if opc is not None:
-                nm = opc.name + "_" + opc.amode
+                nm = f"{opc.name}_{opc.amode}"
                 if opc.is_196:
                     nm += "_196"
                 print("\tcase 0x%03x: %s_full(); break;" % (i, nm), file=f)

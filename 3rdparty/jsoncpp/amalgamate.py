@@ -43,9 +43,8 @@ class AmalgamationFile:
         output_dir = os.path.dirname(output_path)
         if output_dir and not os.path.isdir(output_dir):
             os.makedirs(output_dir)
-        f = open(output_path, "wb")
-        f.write(str.encode(self.get_value(), 'UTF-8'))
-        f.close()
+        with open(output_path, "wb") as f:
+            f.write(str.encode(self.get_value(), 'UTF-8'))
 
 def amalgamate_source(source_top_dir=None,
                        target_source_path=None,
@@ -81,7 +80,7 @@ def amalgamate_source(source_top_dir=None,
     header.write_to(target_header_path)
 
     base, ext = os.path.splitext(header_include_path)
-    forward_header_include_path = base + "-forwards" + ext
+    forward_header_include_path = f"{base}-forwards{ext}"
     print("Amalgating forward header...")
     header = AmalgamationFile(source_top_dir)
     header.add_text("/// Json-cpp amalgated forward header (http://jsoncpp.sourceforge.net/).")
@@ -141,10 +140,11 @@ Generate a single amalgated source and header file from the sources.
     parser.enable_interspersed_args()
     options, args = parser.parse_args()
 
-    msg = amalgamate_source(source_top_dir=options.top_dir,
-                             target_source_path=options.target_source_path,
-                             header_include_path=options.header_include_path)
-    if msg:
+    if msg := amalgamate_source(
+        source_top_dir=options.top_dir,
+        target_source_path=options.target_source_path,
+        header_include_path=options.header_include_path,
+    ):
         sys.stderr.write(msg + "\n")
         sys.exit(1)
     else:

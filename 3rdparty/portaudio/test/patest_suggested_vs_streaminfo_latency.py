@@ -6,6 +6,7 @@ Run and graph the results of patest_suggested_vs_streaminfo_latency.c
 Requires matplotlib for plotting: http://matplotlib.sourceforge.net/
 
 """
+
 import os
 from pylab import *
 import numpy
@@ -19,7 +20,9 @@ outputDeviceIndex = -1 # -1 means default
 sampleRate = 44100
 pdfFilenameSuffix = "_wmme"
 
-pdfFile = PdfPages("patest_suggested_vs_streaminfo_latency_" + str(sampleRate) + pdfFilenameSuffix +".pdf") #output this pdf file
+pdfFile = PdfPages(
+    f"patest_suggested_vs_streaminfo_latency_{sampleRate}{pdfFilenameSuffix}.pdf"
+)
 
 
 def loadCsvData( dataFileName ):
@@ -70,17 +73,10 @@ def setDisplayRangeSeconds( maxSeconds ):
 
 compositeTestFramesPerBufferValues = [0]
 # powers of two
-for i in range (1,11):
-    compositeTestFramesPerBufferValues.append( pow(2,i) )
-
+compositeTestFramesPerBufferValues.extend(pow(2,i) for i in range (1,11))
 # multiples of 50
-for i in range (1,20):
-    compositeTestFramesPerBufferValues.append( i * 50 )
-
-# 10ms buffer sizes
-compositeTestFramesPerBufferValues.append( 441 )
-compositeTestFramesPerBufferValues.append( 882 )
-
+compositeTestFramesPerBufferValues.extend(i * 50 for i in range (1,20))
+compositeTestFramesPerBufferValues.extend((441, 882))
 # large primes
 #compositeTestFramesPerBufferValues.append( 39209 )
 #compositeTestFramesPerBufferValues.append( 37537 )
@@ -91,8 +87,9 @@ individualPlotFramesPerBufferValues = [0,64,128,256,512] #output separate plots 
 isFirst = True    
 
 for framesPerBuffer in compositeTestFramesPerBufferValues:
+    commandString = f"{testExeName} {str(inputDeviceIndex)} {str(outputDeviceIndex)} {str(sampleRate)} {str(framesPerBuffer)} > {dataFileName}"
+
     commandString = testExeName + " " + str(inputDeviceIndex) + " " + str(outputDeviceIndex) + " " + str(sampleRate) + " " + str(framesPerBuffer) + ' > ' + dataFileName
-    print commandString
     os.system(commandString)
 
     d = loadCsvData(dataFileName)
@@ -102,13 +99,13 @@ for framesPerBuffer in compositeTestFramesPerBufferValues:
         gcf().text(0.1, 0.0,
            "patest_suggested_vs_streaminfo_latency\n%s\n%s\n%s\n"%(d.inputDevice,d.outputDevice,d.sampleRate))
         pdfFile.savefig()
-        
-        
+
+
     figure(2) # composite plot, includes all compositeTestFramesPerBufferValues
 
     if isFirst:
         plot( d.suggestedLatency, d.suggestedLatency, label="Suggested latency" )
-    
+
     plot( d.suggestedLatency, d.halfDuplexOutputLatency )
     plot( d.suggestedLatency, d.halfDuplexInputLatency )
     plot( d.suggestedLatency, d.fullDuplexOutputLatency )
@@ -127,11 +124,14 @@ for framesPerBuffer in compositeTestFramesPerBufferValues:
             framesPerBufferText = "paFramesPerBufferUnspecified"
         else:
             framesPerBufferText = str(framesPerBuffer)
-        setFigureTitleAndAxisLabels( "user frames per buffer: "+str(framesPerBufferText) )
+        setFigureTitleAndAxisLabels(f"user frames per buffer: {framesPerBufferText}")
         setDisplayRangeSeconds(2.2)
         pdfFile.savefig()
         setDisplayRangeSeconds(0.1)
-        setFigureTitleAndAxisLabels( "user frames per buffer: "+str(framesPerBufferText)+" (detail)" )
+        setFigureTitleAndAxisLabels(
+            f"user frames per buffer: {framesPerBufferText} (detail)"
+        )
+
         pdfFile.savefig()
 
     isFirst = False

@@ -25,7 +25,7 @@ paHtmlDocDirectory = os.path.join( paRootDirectory, "doc", "html" )
 def recursiveFindFiles( top, extensions, includePaths ):
     result = []
     for (dirpath, dirnames, filenames) in os.walk(top):
-        if not '.svn' in dirpath:
+        if '.svn' not in dirpath:
             for f in filenames:
                 if os.path.splitext(f)[1] in extensions:
                     if includePaths:
@@ -57,21 +57,21 @@ def printError( f, message ):
 
 
 for f in sourceFiles:
-    if not doxygenHtmlDocFileName( os.path.basename(f) ) in docFiles:
+    if doxygenHtmlDocFileName(os.path.basename(f)) not in docFiles:
         printError( f, "no doxygen generated doc page" )
 
     s = file( f, 'rt' ).read()
 
-    if not '/**' in s:
+    if '/**' not in s:
         printError( f, "no doxygen /** block" )  
-    
-    if not '@file' in s:
+
+    if '@file' not in s:
         printError( f, "no doxygen @file tag" )
 
-    if not '@brief' in s:
+    if '@brief' not in s:
         printError( f, "no doxygen @brief tag" )
-        
-    if not '@ingroup' in s:
+
+    if '@ingroup' not in s:
         printError( f, "no doxygen @ingroup tag" )
         
 

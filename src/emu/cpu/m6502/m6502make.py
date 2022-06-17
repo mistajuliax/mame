@@ -110,10 +110,14 @@ PARTIAL_NONE="""\
 """
 def identify_line_type(ins):
     if "eat-all-cycles" in ins: return "EAT"
-    for s in ["read", "write", "prefetch(", "prefetch_noirq("]:
-        if s in ins:
-            return "MEMORY"
-    return "NONE"
+    return next(
+        (
+            "MEMORY"
+            for s in ["read", "write", "prefetch(", "prefetch_noirq("]
+            if s in ins
+        ),
+        "NONE",
+    )
 
 
 def save_opcodes(f, device, opcodes):
@@ -191,8 +195,8 @@ def save_tables(f, device, states):
     d = { "device": device,
           "disasm_count": total_states-1
           }
-    
-    
+
+
     emit(f, DO_EXEC_FULL_PROLOG % d)
     for n, state in enumerate(states):
         if state == ".": continue

@@ -6,6 +6,7 @@
 """Simple implementation of a json test runner to run the test against
 json-py."""
 
+
 from __future__ import print_function
 import sys
 import os.path
@@ -15,18 +16,18 @@ import types
 if len(sys.argv) != 2:
     print("Usage: %s input-json-file", sys.argv[0])
     sys.exit(3)
-    
+
 input_path = sys.argv[1]
 base_path = os.path.splitext(input_path)[0]
-actual_path = base_path + '.actual'
-rewrite_path = base_path + '.rewrite'
-rewrite_actual_path = base_path + '.actual-rewrite'
+actual_path = f'{base_path}.actual'
+rewrite_path = f'{base_path}.rewrite'
+rewrite_actual_path = f'{base_path}.actual-rewrite'
 
 def valueTreeToString(fout, value, path = '.'):
-    ty = type(value) 
+    ty = type(value)
     if ty  is types.DictType:
         fout.write('%s={}\n' % path)
-        suffix = path[-1] != '.' and '.' or ''
+        suffix = '.' if path[-1] != '.' else ''
         names = value.keys()
         names.sort()
         for name in names:
@@ -48,7 +49,7 @@ def valueTreeToString(fout, value, path = '.'):
     elif value is None:
         fout.write('%s=null\n' % path)
     else:
-        assert False and "Unexpected value type"
+        assert False
         
 def parseAndSaveValueTree(input, actual_path):
     root = json.loads(input)

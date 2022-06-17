@@ -27,17 +27,15 @@ def generate(env):
         then all instances of %VERSION% in the file will be replaced with 1.2345 etc.
         """
         try:
-            f = open(sourcefile, 'rb')
-            contents = f.read()
-            f.close()
+            with open(sourcefile, 'rb') as f:
+                contents = f.read()
         except:
             raise SCons.Errors.UserError("Can't read source file %s"%sourcefile)
         for (k,v) in list(dict.items()):
             contents = re.sub(k, v, contents)
         try:
-            f = open(targetfile, 'wb')
-            f.write(contents)
-            f.close()
+            with open(targetfile, 'wb') as f:
+                f.write(contents)
         except:
             raise SCons.Errors.UserError("Can't write target file %s"%targetfile)
         return 0 # success
@@ -52,14 +50,21 @@ def generate(env):
             elif SCons.Util.is_String(v):
                 d[k] = env.subst(v).replace('\\','\\\\')
             else:
-                raise SCons.Errors.UserError("SubstInFile: key %s: %s must be a string or callable"%(k, repr(v)))
+                raise SCons.Errors.UserError(
+                    f"SubstInFile: key {k}: {repr(v)} must be a string or callable"
+                )
+
         for (t,s) in zip(target, source):
             return do_subst_in_file(str(t), str(s), d)
 
     def subst_in_file_string(target, source, env):
         """This is what gets printed on the console."""
-        return '\n'.join(['Substituting vars from %s into %s'%(str(s), str(t))
-                          for (t,s) in zip(target, source)])
+        return '\n'.join(
+            [
+                f'Substituting vars from {str(s)} into {str(t)}'
+                for (t, s) in zip(target, source)
+            ]
+        )
 
     def subst_emitter(target, source, env):
         """Add dependency from substituted SUBST_DICT to target.

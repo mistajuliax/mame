@@ -28,7 +28,7 @@ def findJedTests(jedPath, baselinePath, outputPath):
     """
     Given a path to some jed files, returns a list of JedTest objects.
     """
-    jedTestList = list()
+    jedTestList = []
     for (path, dirs, files) in os.walk(jedPath):
         if '.svn' in path:
             continue
@@ -43,8 +43,8 @@ def findJedTests(jedPath, baselinePath, outputPath):
             test = JedTest()
             test.name = subpathName
             test.jedFile = jedPathFull
-            test.baselineFile = os.path.join(baselinePath, subpathName, palName+".txt")
-            test.outputFile = os.path.join(outputPath, subpathName, palName+".txt")
+            test.baselineFile = os.path.join(baselinePath, subpathName, f"{palName}.txt")
+            test.outputFile = os.path.join(outputPath, subpathName, f"{palName}.txt")
             jedTestList.append(test)
 
     return jedTestList
@@ -58,18 +58,22 @@ def runViewJedTests(tests, jedUtilApp):
     for test in tests:
         command = [jedUtilApp, "-view", test.jedFile, test.name]
         if VERBOSE:
-            print("Viewing the JED file: %s" % test.jedFile)
-            print("Command: %s" % " ".join(command))
+            print(f"Viewing the JED file: {test.jedFile}")
+            print(f'Command: {" ".join(command)}')
 
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdout,stderr) = process.communicate()
-        
-        if stderr:
-            print("Error: JED test named " + test.name + " failed during viewing (" + stderr.decode('latin-1').strip() + ").")
 
-        fp = open(test.outputFile, "wb")
-        fp.write(stdout)
-        fp.close()
+        if stderr:
+            print(
+                f"Error: JED test named {test.name} failed during viewing ("
+                + stderr.decode('latin-1').strip()
+                + ")."
+            )
+
+
+        with open(test.outputFile, "wb") as fp:
+            fp.write(stdout)
     
 
 # MAIN
@@ -85,10 +89,10 @@ def main():
         jedUtilApp = os.path.normpath(os.path.join(currentDirectory, "..", "..", "..", "jedutil"))
 
     if VERBOSE:
-        print("JED Path:      %s" % jedsPath)
-        print("Baseline Path: %s" % baselinePath)
-        print("Output Path:   %s" % outputPath)
-        print("jedutil App:   %s" % jedUtilApp)
+        print(f"JED Path:      {jedsPath}")
+        print(f"Baseline Path: {baselinePath}")
+        print(f"Output Path:   {outputPath}")
+        print(f"jedutil App:   {jedUtilApp}")
         print('')
 
 
@@ -97,7 +101,7 @@ def main():
         not os.path.exists(jedsPath) or
         not os.path.exists(baselinePath) or
         not os.path.exists(jedUtilApp)):
-        print("One of the above paths does not exist.  Aborting. %s" % jedUtilApp)
+        print(f"One of the above paths does not exist.  Aborting. {jedUtilApp}")
         return 3
 
 
@@ -129,10 +133,13 @@ def main():
     success = True
     for test in tests:
         if VERBOSE:
-            print("Diffing the output from viewing the JED file: %s" % os.path.basename(test.jedFile))
+            print(
+                f"Diffing the output from viewing the JED file: {os.path.basename(test.jedFile)}"
+            )
+
         if not filecmp.cmp(test.outputFile, test.baselineFile):
             success = False
-            print("Test %s failed" % os.path.basename(test.jedFile))
+            print(f"Test {os.path.basename(test.jedFile)} failed")
 
 
     # Report

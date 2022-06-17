@@ -12,7 +12,7 @@ files_included = ['src/emu/emu.h']
 
 include_dirs = ['src/emu/', 'src/mame/', 'src/mess/']
 
-mappings = dict()
+mappings = {}
 
 deps_files_included = [ ]
 
@@ -73,11 +73,13 @@ def parse_file_for_deps(root, srcfile, folder):
         while srcptr < len(line):
             c = line[srcptr]
             srcptr+=1
-            if c==13 or c==10:
-                if c==13 and line[srcptr]==10:
+            if c == 10:
+                continue
+            elif c == 13:
+                if line[srcptr] == 10:
                     srcptr+=1
                 continue
-            if c==' ' or c==9:
+            if c in [' ', 9]:
                 continue
             if in_comment==1 and c=='*' and line[srcptr]=='/' :
                 srcptr+=1
@@ -93,20 +95,18 @@ def parse_file_for_deps(root, srcfile, folder):
                 break
             content += c
         content = content.strip()
-        if len(content)>0:
-            if content.startswith('#include'):
-               name = content[8:]
-               name = name.replace('"','')
-               fullname = file_exists(root, name, folder,deps_include_dirs)
-               if fullname in deps_files_included:
-                   continue
-               if fullname!='':
-                   deps_files_included.append(fullname)
-                   add_c_if_exists(root, fullname.replace('.h','.c'))
-                   add_rest_if_exists(root, fullname,folder)
-                   newfolder = fullname.rsplit('/', 1)[0] + '/'
-                   parse_file_for_deps(root, fullname, newfolder)
-               continue
+        if len(content) > 0 and content.startswith('#include'):
+            name = content[8:]
+            name = name.replace('"','')
+            fullname = file_exists(root, name, folder,deps_include_dirs)
+            if fullname in deps_files_included:
+                continue
+            if fullname!='':
+                deps_files_included.append(fullname)
+                add_c_if_exists(root, fullname.replace('.h','.c'))
+                add_rest_if_exists(root, fullname,folder)
+                newfolder = fullname.rsplit('/', 1)[0] + '/'
+                parse_file_for_deps(root, fullname, newfolder)
     fp.close()
     return 0
 
@@ -124,11 +124,13 @@ def parse_file(root, srcfile, folder):
         while srcptr < len(line):
             c = line[srcptr]
             srcptr+=1
-            if c==13 or c==10:
-                if c==13 and line[srcptr]==10:
+            if c == 10:
+                continue
+            elif c == 13:
+                if line[srcptr] == 10:
                     srcptr+=1
                 continue
-            if c==' ' or c==9:
+            if c in [' ', 9]:
                 continue
             if in_comment==1 and c=='*' and line[srcptr]=='/' :
                 srcptr+=1
@@ -144,25 +146,25 @@ def parse_file(root, srcfile, folder):
                 break
             content += c
         content = content.strip()
-        if len(content)>0:
-            if content.startswith('#include'):
-               name = content[8:]
-               name = name.replace('"','')
-               fullname = file_exists(root, name, folder,include_dirs)
-               if fullname in files_included:
-                   continue
-               if "src/emu/netlist/" in fullname:
-                   continue
-               if fullname!='':
-                   if fullname in mappings.keys():
-                        if not(mappings[fullname] in components):
-                            components.append(mappings[fullname])
-                   files_included.append(fullname)
-                   newfolder = fullname.rsplit('/', 1)[0] + '/'
-                   parse_file(root, fullname, newfolder)
-                   if (fullname.endswith('.h')):
-                       parse_file(root, fullname.replace('.h','.c'), newfolder)
-               continue
+        if len(content) > 0 and content.startswith('#include'):
+            name = content[8:]
+            name = name.replace('"','')
+            fullname = file_exists(root, name, folder,include_dirs)
+            if fullname in files_included:
+                continue
+            if "src/emu/netlist/" in fullname:
+                continue
+            if fullname!='':
+                if (
+                    fullname in mappings.keys()
+                    and mappings[fullname] not in components
+                ):
+                    components.append(mappings[fullname])
+                files_included.append(fullname)
+                newfolder = fullname.rsplit('/', 1)[0] + '/'
+                parse_file(root, fullname, newfolder)
+                if (fullname.endswith('.h')):
+                    parse_file(root, fullname.replace('.h','.c'), newfolder)
     fp.close()
     return 0
 
@@ -173,19 +175,19 @@ def parse_file_for_drivers(root, srcfile):
         sys.stderr.write("Unable to open source file '%s'\n" % srcfile)
         return 1
     in_comment = 0
-    linenum = 0
     for line in fp.readlines():
         content = ''
-        linenum+=1
         srcptr = 0
         while srcptr < len(line):
             c = line[srcptr]
             srcptr+=1
-            if c==13 or c==10:
-                if c==13 and line[srcptr]==10:
+            if c == 10:
+                continue
+            elif c == 13:
+                if line[srcptr] == 10:
                     srcptr+=1
                 continue
-            if c==' ' or c==9:
+            if c in [' ', 9]:
                 continue
             if in_comment==1 and c=='*' and line[srcptr]=='/' :
                 srcptr+=1
@@ -201,10 +203,15 @@ def parse_file_for_drivers(root, srcfile):
                 break
             content += c
         content = content.strip()
-        if len(content)>0:
-            if content.startswith('COMP') or content.startswith('CONS') or content.startswith('GAME') or content.startswith('SYST')  or content.startswith('GAMEL'):
-               name = content[4:]
-               drivers.append(name.rsplit(',', 14)[1])
+        if len(content) > 0 and (
+            content.startswith('COMP')
+            or content.startswith('CONS')
+            or content.startswith('GAME')
+            or content.startswith('SYST')
+            or content.startswith('GAMEL')
+        ):
+            name = content[4:]
+            drivers.append(name.rsplit(',', 14)[1])
     return 0
 
 def parse_lua_file(srcfile):
@@ -215,10 +222,9 @@ def parse_lua_file(srcfile):
         return 1
     for line in fp.readlines():
         content = line.strip()
-        if len(content)>0:
-            if content.startswith('--@'):
-               name = content[3:]
-               mappings[name.rsplit(',', 1)[0]] = name.rsplit(',', 1)[1]
+        if len(content) > 0 and content.startswith('--@'):
+            name = content[3:]
+            mappings[name.rsplit(',', 1)[0]] = name.rsplit(',', 1)[1]
     return 0
 
 if len(sys.argv) < 5:
@@ -226,13 +232,13 @@ if len(sys.argv) < 5:
     print('  makedep <root> <source.c> <type> <target>')
     sys.exit(0)
 
-root = sys.argv[1] + '/'
+root = f'{sys.argv[1]}/'
 
-parse_lua_file(root +'scripts/src/bus.lua')
-parse_lua_file(root +'scripts/src/cpu.lua')
-parse_lua_file(root +'scripts/src/machine.lua')
-parse_lua_file(root +'scripts/src/sound.lua')
-parse_lua_file(root +'scripts/src/video.lua')
+parse_lua_file(f'{root}scripts/src/bus.lua')
+parse_lua_file(f'{root}scripts/src/cpu.lua')
+parse_lua_file(f'{root}scripts/src/machine.lua')
+parse_lua_file(f'{root}scripts/src/sound.lua')
+parse_lua_file(f'{root}scripts/src/video.lua')
 
 for filename in sys.argv[2].rsplit(',') :
     deps_files_included.append(filename.replace('\\','/'))
@@ -244,31 +250,31 @@ for filename in deps_files_included:
 for filename in sys.argv[2].rsplit(',') :
     parse_file_for_drivers(root,filename)
 
-	
+
 # display output
 if sys.argv[3]=='drivers':
-	# add a reference to the ___empty driver
-	drivers.append("___empty")
+    # add a reference to the ___empty driver
+    drivers.append("___empty")
 
-	# start with a header
-	print('#include "emu.h"\n')
-	print('#include "drivenum.h"\n')
+    # start with a header
+    print('#include "emu.h"\n')
+    print('#include "drivenum.h"\n')
 
-	#output the list of externs first
-	for drv in sorted(drivers):
-		print("GAME_EXTERN(%s);" % drv)
-	print("")
+    	#output the list of externs first
+    for drv in sorted(drivers):
+        print(f"GAME_EXTERN({drv});")
+    print("")
 
-	# then output the array
-	print("const game_driver * const driver_list::s_drivers_sorted[%d] =" % len(drivers))
-	print("{")
-	for drv in sorted(drivers):
-		print("\t&GAME_NAME(%s)," % drv)
-	print("};")
-	print("")
+    # then output the array
+    print("const game_driver * const driver_list::s_drivers_sorted[%d] =" % len(drivers))
+    print("{")
+    for drv in sorted(drivers):
+    	print("\t&GAME_NAME(%s)," % drv)
+    print("};")
+    print("")
 
-	# also output a global count
-	print("int driver_list::s_driver_count = %d;\n" % len(drivers))
+    # also output a global count
+    print("int driver_list::s_driver_count = %d;\n" % len(drivers))
 
 if sys.argv[3]=='target':
     for line in components:

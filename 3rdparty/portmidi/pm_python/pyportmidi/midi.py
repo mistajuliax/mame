@@ -216,10 +216,10 @@ class Input(object):
         waiting to be read using Input.read().
         """
         _check_init()
- 
+
         if device_id == -1:
             raise MidiException("Device id is -1, not a valid output id.  -1 usually means there were no default Output devices.")
-            
+
         try:
             r = get_device_info(device_id)
         except TypeError:
@@ -262,7 +262,7 @@ class Input(object):
         exits -- this is particularly difficult under Windows.
         """
         _check_init()
-        if not (self._input is None):
+        if self._input is not None:
             self._input.Close()
         self._input = None
 
@@ -355,13 +355,13 @@ class Output(object):
         to synchronize midi data to audio data by matching midi latency to 
         the audio buffer latency.
         """
-     
+
         _check_init()
         self._aborted = 0
 
         if device_id == -1:
             raise MidiException("Device id is -1, not a valid output id.  -1 usually means there were no default Output devices.")
-            
+
         try:
             r = get_device_info(device_id)
         except TypeError:
@@ -403,7 +403,7 @@ class Output(object):
         exits -- this is particularly difficult under Windows.
         """
         _check_init()
-        if not (self._output is None):
+        if self._output is not None:
             self._output.Close()
         self._output = None
 

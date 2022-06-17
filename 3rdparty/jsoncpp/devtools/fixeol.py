@@ -13,7 +13,7 @@ def fix_source_eol(path, is_dry_run = True, verbose = True, eol = '\n'):
     try:
         f = open(path, 'rb')
     except IOError as msg:
-        print("%s: I/O Error: %s" % (file, str(msg)), file=sys.stderr)
+        print(f"{file}: I/O Error: {str(msg)}", file=sys.stderr)
         return False
     try:
         raw_lines = f.readlines()
@@ -21,7 +21,7 @@ def fix_source_eol(path, is_dry_run = True, verbose = True, eol = '\n'):
         f.close()
     fixed_lines = [line.rstrip('\r\n') + eol for line in raw_lines]
     if raw_lines != fixed_lines:
-        print('%s =>' % path, end=' ')
+        print(f'{path} =>', end=' ')
         if not is_dry_run:
             f = open(path, "wb")
             try:
